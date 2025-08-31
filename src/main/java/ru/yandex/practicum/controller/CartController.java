@@ -33,7 +33,7 @@ public class CartController {
         });
     }
 
-    @PostMapping(path = "/cart/items/{id}", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
+    @PostMapping(path = "/cart/items/{id}")
     public Mono<String> updateCart(@PathVariable Long id, WebSession webSession, ServerWebExchange exchange) {
         return exchange.getFormData()
                 .flatMap(form -> {

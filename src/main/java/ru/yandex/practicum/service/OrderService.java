@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import ru.yandex.practicum.exception.NotFoundException;
 import ru.yandex.practicum.model.entity.Order;
 import ru.yandex.practicum.model.entity.OrderItem;
 import ru.yandex.practicum.repository.OrderItemRepository;
@@ -23,7 +24,7 @@ public class OrderService {
         return cartService.getAll(sessionId).collectList()
                 .flatMap(cartItems -> {
                     if (cartItems.isEmpty()) {
-                        return Mono.error(new IllegalStateException("Корзина пуста"));
+                        return Mono.empty();
                     }
 
                     BigDecimal total = cartItems.stream()
@@ -31,7 +32,7 @@ public class OrderService {
                             .reduce(BigDecimal.ZERO, BigDecimal::add);
 
                     Order toSave = Order.builder()
-                            .totalSum(total) // важный момент: не null
+                            .totalSum(total)
                             .build();
 
                     return orderRepository.save(toSave)
@@ -62,7 +63,7 @@ public class OrderService {
 
     public Mono<Order> getById(Long id) {
         return orderRepository.findById(id)
-                .switchIfEmpty(Mono.error(new RuntimeException("Order not found")));
+                .switchIfEmpty(Mono.error(new NotFoundException("Order not found")));
     }
 
     private Mono<Order> attachItems(Order order) {

@@ -1,7 +1,6 @@
 package ru.yandex.practicum.controller;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -9,6 +8,7 @@ import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.WebSession;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import ru.yandex.practicum.exception.NotFoundException;
 import ru.yandex.practicum.model.SortType;
 import ru.yandex.practicum.model.dto.ItemViewDto;
 import ru.yandex.practicum.service.CartService;
@@ -80,7 +80,7 @@ public class MainController {
             Model model
     ) {
         return productService.getById(id)
-                .switchIfEmpty(Mono.error(new RuntimeException("Not found")))
+                .switchIfEmpty(Mono.error(new NotFoundException("Not found")))
                 .flatMap(product -> cartService.getCountForProduct(webSession.getId(), product.getId())
                         .map(count -> productService.toDto(product, count)))
                 .flatMap(itemView -> {
@@ -89,7 +89,7 @@ public class MainController {
                 });
     }
 
-    @PostMapping(path = "/items/{id}", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
+    @PostMapping(path = "/items/{id}")
     public Mono<String> updateFromItem(
             @PathVariable Long id,
             WebSession webSession,

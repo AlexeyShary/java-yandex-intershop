@@ -1,57 +1,63 @@
 package ru.yandex.practicum.service;
 
-import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import ru.yandex.practicum.model.dto.ItemViewDto;
 import ru.yandex.practicum.model.entity.Product;
 import ru.yandex.practicum.model.SortType;
 import ru.yandex.practicum.repository.ProductRepository;
 
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.Comparator;
 
 @Service
 @RequiredArgsConstructor
 public class ProductService {
     private final ProductRepository productRepository;
-    private final HttpSession session;
+    private final CartService cartService;
 
-    public Page<ItemViewDto> getProducts(String search, SortType sort, int page, int size) {
-        List<Product> filtered = productRepository.findAll().stream()
-                .filter(p -> search == null || search.isBlank()
-                        || p.getTitle().toLowerCase().contains(search.toLowerCase())
-                        || p.getDescription().toLowerCase().contains(search.toLowerCase()))
-                .collect(Collectors.toList());
+    public Flux<ItemViewDto> getProducts(String search, SortType sort, int page, int size, String sessionId) {
+        Flux<Product> all = productRepository.findAll();
 
-        switch (sort) {
-            case ALPHA -> filtered.sort(Comparator.comparing(Product::getTitle));
-            case PRICE -> filtered.sort(Comparator.comparing(Product::getPrice));
+        if (search != null && !search.isBlank()) {
+            String lower = search.toLowerCase();
+            all = all.filter(p ->
+                    p.getTitle().toLowerCase().contains(lower) ||
+                            p.getDescription().toLowerCase().contains(lower)
+            );
         }
 
-        int from = Math.min((page - 1) * size, filtered.size());
-        int to = Math.min(from + size, filtered.size());
-        List<Product> pageContent = filtered.subList(from, to);
+        switch (sort) {
+            case ALPHA -> all = all.sort(Comparator.comparing(Product::getTitle));
+            case PRICE -> all = all.sort(Comparator.comparing(Product::getPrice));
+        }
 
-        List<ItemViewDto> views = pageContent.stream()
-                .map(this::toDto)
-                .toList();
-
-        return new PageImpl<>(views, PageRequest.of(page - 1, size), filtered.size());
+        return all.skip((long) (page - 1) * size)
+                .take(size)
+                .flatMap(product -> cartService.getCountForProduct(sessionId, product.getId())
+                        .map(count -> toDto(product, count)));
     }
 
-    public Optional<Product> getById(Long id) {
+    public Mono<Long> getTotalCount(String search) {
+        Flux<Product> all = productRepository.findAll();
+
+        if (search != null && !search.isBlank()) {
+            String lower = search.toLowerCase();
+            all = all.filter(p ->
+                    p.getTitle().toLowerCase().contains(lower) ||
+                            p.getDescription().toLowerCase().contains(lower)
+            );
+        }
+
+        return all.count();
+    }
+
+    public Mono<Product> getById(Long id) {
         return productRepository.findById(id);
     }
 
-    public ItemViewDto toDto(Product product) {
-        Map<Long, Integer> cart = session.getAttribute("cart") == null
-                ? new HashMap<>()
-                : (Map<Long, Integer>) session.getAttribute("cart");
-
-        int count = cart.getOrDefault(product.getId(), 0);
-
+    public ItemViewDto toDto(Product product, int count) {
         return ItemViewDto.builder()
                 .id(product.getId())
                 .title(product.getTitle())

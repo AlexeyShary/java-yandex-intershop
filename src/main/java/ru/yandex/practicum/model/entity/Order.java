@@ -1,13 +1,14 @@
 package ru.yandex.practicum.model.entity;
 
-import jakarta.persistence.*;
 import lombok.*;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Transient;
+import org.springframework.data.relational.core.mapping.Table;
 
 import java.math.BigDecimal;
 import java.util.List;
 
-@Entity
-@Table(name = "orders")
+@Table("orders")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -15,12 +16,10 @@ import java.util.List;
 @Builder
 public class Order {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL)
-    private List<OrderItem> items;
-
-    @Column(precision = 10, scale = 2)
     private BigDecimal totalSum;
+
+    @Transient
+    private List<OrderItem> items;
 }

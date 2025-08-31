@@ -1,11 +1,12 @@
 package ru.yandex.practicum.model.entity;
 
-import jakarta.persistence.*;
 import lombok.*;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.relational.core.mapping.Table;
 
 import java.math.BigDecimal;
 
-@Entity
+@Table("order_item")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -13,11 +14,9 @@ import java.math.BigDecimal;
 @Builder
 public class OrderItem {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne
-    private Order order;
+    private Long orderId;
 
     private Long productId;
     private String title;

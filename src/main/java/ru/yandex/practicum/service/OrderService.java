@@ -2,13 +2,14 @@ package ru.yandex.practicum.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import ru.yandex.practicum.model.dto.ItemViewDto;
-import ru.yandex.practicum.model.entity.*;
-import ru.yandex.practicum.repository.*;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import ru.yandex.practicum.model.entity.Order;
+import ru.yandex.practicum.model.entity.OrderItem;
+import ru.yandex.practicum.repository.OrderItemRepository;
+import ru.yandex.practicum.repository.OrderRepository;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -18,43 +19,58 @@ public class OrderService {
     private final OrderItemRepository orderItemRepository;
     private final CartService cartService;
 
-    @Transactional
-    public Order buyItems() {
-        List<ItemViewDto> cartItems = cartService.getAll();
-        List<OrderItem> orderItems = new ArrayList<>();
+    public Mono<Order> buyItems(String sessionId) {
+        return cartService.getAll(sessionId).collectList()
+                .flatMap(cartItems -> {
+                    if (cartItems.isEmpty()) {
+                        return Mono.error(new IllegalStateException("Корзина пуста"));
+                    }
 
-        BigDecimal total = BigDecimal.ZERO;
-        Order order = Order.builder().build();
-        orderRepository.save(order);
+                    BigDecimal total = cartItems.stream()
+                            .map(i -> i.getPrice().multiply(BigDecimal.valueOf(i.getCount())))
+                            .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        for (ItemViewDto item : cartItems) {
-            OrderItem orderItem = OrderItem.builder()
-                    .order(order)
-                    .productId(item.getId())
-                    .title(item.getTitle())
-                    .description(item.getDescription())
-                    .imgPath(item.getImgPath())
-                    .price(item.getPrice())
-                    .count(item.getCount())
-                    .build();
+                    Order toSave = Order.builder()
+                            .totalSum(total) // важный момент: не null
+                            .build();
 
-            total = total.add(item.getPrice().multiply(BigDecimal.valueOf(item.getCount())));
-            orderItems.add(orderItem);
-        }
+                    return orderRepository.save(toSave)
+                            .flatMap(savedOrder -> {
+                                List<OrderItem> orderItems = cartItems.stream()
+                                        .map(item -> OrderItem.builder()
+                                                .orderId(savedOrder.getId())
+                                                .productId(item.getId())
+                                                .title(item.getTitle())
+                                                .description(item.getDescription())
+                                                .imgPath(item.getImgPath())
+                                                .price(item.getPrice())
+                                                .count(item.getCount())
+                                                .build())
+                                        .collect(java.util.stream.Collectors.toList());
 
-        order.setItems(orderItems);
-        order.setTotalSum(total);
-        orderRepository.save(order);
-        orderItemRepository.saveAll(orderItems);
-        cartService.clearCart();
-        return order;
+                                return orderItemRepository.saveAll(orderItems)
+                                        .then(cartService.clearCart(sessionId))
+                                        .thenReturn(savedOrder);
+                            });
+                });
     }
 
-    public List<Order> getAll() {
-        return orderRepository.findAll();
+    public Flux<Order> getAll() {
+        return orderRepository.findAll()
+                .flatMap(this::attachItems);
     }
 
-    public Order getById(Long id) {
-        return orderRepository.findById(id).orElseThrow();
+    public Mono<Order> getById(Long id) {
+        return orderRepository.findById(id)
+                .switchIfEmpty(Mono.error(new RuntimeException("Order not found")));
+    }
+
+    private Mono<Order> attachItems(Order order) {
+        return orderItemRepository.findByOrderId(order.getId())
+                .collectList()
+                .map(items -> {
+                    order.setItems(items);
+                    return order;
+                });
     }
 }

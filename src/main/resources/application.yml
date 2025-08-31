@@ -1,12 +1,42 @@
 spring:
-  datasource:
-    url: jdbc:h2:mem:intershopdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
-    driver-class-name: org.h2.Driver
+  r2dbc:
+    url: r2dbc:h2:mem:///intershopdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
     username: sa
     password:
-  jpa:
-    hibernate:
-      ddl-auto: none
+
+  thymeleaf:
+    encoding: UTF-8
+    mode: HTML
+    servlet:
+      content-type: text/html
+
   sql:
     init:
       mode: always
+      schema-locations: classpath:schema.sql
+
+  main:
+    web-application-type: reactive
+
+logging:
+  level:
+    root: INFO
+    org.springframework.web: DEBUG
+    org.springframework.web.reactive: DEBUG
+    org.springframework.web.reactive.result.method.annotation: TRACE
+    org.springframework.web.reactive.result.method: TRACE
+    org.springframework.web.server.adapter.HttpWebHandlerAdapter: TRACE
+    org.springframework.http.codec: TRACE
+    org.springframework.web.reactive.function.server: TRACE
+    org.springframework.web.reactive.result.view: TRACE
+    org.springframework.web.reactive.resource: TRACE
+    org.springframework.web.reactive.DispatcherHandler: TRACE
+    org.springframework.web.reactive.result.method.annotation.RequestMappingHandlerMapping: TRACE
+    org.springframework.web.reactive.result.method.annotation.RequestMappingHandlerAdapter: TRACE
+    reactor.netty: DEBUG
+
+server:
+  error:
+    include-message: always
+    include-binding-errors: always
+    include-stacktrace: always

@@ -1,11 +1,12 @@
 package ru.yandex.practicum.model.entity;
 
-import jakarta.persistence.*;
 import lombok.*;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.relational.core.mapping.Table;
 
 import java.math.BigDecimal;
 
-@Entity
+@Table("product")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -13,12 +14,9 @@ import java.math.BigDecimal;
 @Builder
 public class Product {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(precision = 10, scale = 2)
     private BigDecimal price;
-
     private String title;
     private String description;
     private String imgPath;

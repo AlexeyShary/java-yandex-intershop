@@ -1,17 +1,15 @@
 package ru.yandex.practicum.service;
 
-import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import ru.yandex.practicum.model.dto.ItemViewDto;
-import ru.yandex.practicum.model.entity.Product;
 import ru.yandex.practicum.repository.ProductRepository;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 @RequiredArgsConstructor
@@ -21,46 +19,44 @@ public class CartService {
     private static final String DELETE_ACTION = "DELETE";
 
     private final ProductRepository productRepository;
-    private final HttpSession session;
 
-    private Map<Long, Integer> getSessionCart() {
-        Object raw = session.getAttribute("cart");
-        if (raw == null) {
-            Map<Long, Integer> newCart = new HashMap<>();
-            session.setAttribute("cart", newCart);
-            return newCart;
-        }
-        return (Map<Long, Integer>) raw;
+    private final Map<String, Map<Long, Integer>> carts = new ConcurrentHashMap<>();
+
+    private Map<Long, Integer> getCart(String sessionId) {
+        return carts.computeIfAbsent(sessionId, k -> new HashMap<>());
     }
 
-    public List<ItemViewDto> getAll() {
-        Map<Long, Integer> cart = getSessionCart();
-        List<ItemViewDto> result = new ArrayList<>();
-
-        for (Map.Entry<Long, Integer> entry : cart.entrySet()) {
-            Product product = productRepository.findById(entry.getKey())
-                    .orElseThrow();
-            result.add(ItemViewDto.builder()
-                    .id(product.getId())
-                    .title(product.getTitle())
-                    .description(product.getDescription())
-                    .imgPath(product.getImgPath())
-                    .price(product.getPrice())
-                    .count(entry.getValue())
-                    .build());
-        }
-
-        return result;
+    public Flux<ItemViewDto> getAll(String sessionId) {
+        Map<Long, Integer> cart = getCart(sessionId);
+        return Flux.fromIterable(cart.entrySet())
+                .flatMap(entry ->
+                        productRepository.findById(entry.getKey())
+                                .map(product -> ItemViewDto.builder()
+                                        .id(product.getId())
+                                        .title(product.getTitle())
+                                        .description(product.getDescription())
+                                        .imgPath(product.getImgPath())
+                                        .price(product.getPrice())
+                                        .count(entry.getValue())
+                                        .build()
+                                )
+                );
     }
 
-    public BigDecimal getTotal() {
-        return getAll().stream()
-                .map(i -> i.getPrice().multiply(BigDecimal.valueOf(i.getCount())))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    public Mono<String> getTotal(String sessionId) {
+        return getAll(sessionId)
+                .map(item -> item.getPrice().multiply(BigDecimal.valueOf(item.getCount())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .map(BigDecimal::toPlainString);
     }
 
-    public void updateItem(Long productId, String action) {
-        Map<Long, Integer> cart = getSessionCart();
+    public Mono<Integer> getCountForProduct(String sessionId, Long productId) {
+        Map<Long, Integer> cart = getCart(sessionId);
+        return Mono.just(cart.getOrDefault(productId, 0));
+    }
+
+    public Mono<Void> updateItem(String sessionId, Long productId, String action) {
+        Map<Long, Integer> cart = getCart(sessionId);
         int count = cart.getOrDefault(productId, 0);
 
         switch (action.toUpperCase()) {
@@ -72,10 +68,11 @@ public class CartService {
             case DELETE_ACTION -> cart.remove(productId);
         }
 
-        session.setAttribute("cart", cart);
+        return Mono.empty();
     }
 
-    public void clearCart() {
-        session.removeAttribute("cart");
+    public Mono<Void> clearCart(String sessionId) {
+        carts.remove(sessionId);
+        return Mono.empty();
     }
 }

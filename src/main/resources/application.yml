@@ -18,23 +18,6 @@ spring:
   main:
     web-application-type: reactive
 
-logging:
-  level:
-    root: INFO
-    org.springframework.web: DEBUG
-    org.springframework.web.reactive: DEBUG
-    org.springframework.web.reactive.result.method.annotation: TRACE
-    org.springframework.web.reactive.result.method: TRACE
-    org.springframework.web.server.adapter.HttpWebHandlerAdapter: TRACE
-    org.springframework.http.codec: TRACE
-    org.springframework.web.reactive.function.server: TRACE
-    org.springframework.web.reactive.result.view: TRACE
-    org.springframework.web.reactive.resource: TRACE
-    org.springframework.web.reactive.DispatcherHandler: TRACE
-    org.springframework.web.reactive.result.method.annotation.RequestMappingHandlerMapping: TRACE
-    org.springframework.web.reactive.result.method.annotation.RequestMappingHandlerAdapter: TRACE
-    reactor.netty: DEBUG
-
 server:
   error:
     include-message: always
